@@ -1,5 +1,3 @@
--- Check for missing values in each table
-
 /*
 
 DATA CLEANING RESULTS:
@@ -18,7 +16,26 @@ status.
 - order_reviews: 88% missing title, 59% missing comment message. Expected, as most reviewers 
 just leave a star rating without text. 
 
+4. Checking for any translation issues: product_category_name_translation - Found 2 product 
+categories in "products" with no matching English translation
+(portateis_cozinha_e_preparadores_de_alimentos, pc_gamer). Added both directly via INSERT, 
+since these were real categories in the table. Re-ran the check, 0 unmatched categories.
+
+5. Repeat customers (customers with more than one order): customer_id is unique per order, 
+not per customer. So repeat customers get new id each order. customer_unique_id identifies 
+distinct customers. 
+
+6. Confirmed 99,441 customer_id rows vs. 96,096 customer_unique_id rows (confirms customer_id 
+inflates the number of customers). 
+
+7. Confirmed 2,997 customers (customer_unique_id) placed more than one order. 
+Highest # of orders for 1 customer: 17
+
+8. Calculated repeat purchase rate using customer_unique_id: 3.12% (2,997 of 96,096 
+unique customers ordered more than once).
 */
+
+-- Check for missing values in each table
 
 -- Customers
 SELECT
@@ -171,3 +188,52 @@ FROM order_reviews;
 
 /* Missing title/message is expected, not an error: most people leave a rating without 
 writing anything. Leaving as-is, no further investigation needed. */
+
+/* Checking for translation issues: 
+- any product categories that exist in "products" but have no matching row in the 
+translation table. */
+
+SELECT DISTINCT p.product_category_name
+FROM products p
+LEFT JOIN product_category_name_translation t 
+    ON p.product_category_name = t.product_category_name
+WHERE p.product_category_name IS NOT NULL 
+    AND t.product_category_name IS NULL;
+
+-- Add the 2 missing category translations directly to the table
+
+INSERT INTO product_category_name_translation (product_category_name, 
+product_category_name_english)
+VALUES
+    ('portateis_cozinha_e_preparadores_de_alimentos', 'portable_kitchen_and_food_preparers'),
+    ('pc_gamer', 'gaming_pc');
+
+-- Repeat Customers:
+
+-- Compare raw customer_id count vs distinct customer_unique_id count 
+
+SELECT 
+    COUNT(customer_id) AS customer_id_count,
+    COUNT(DISTINCT customer_unique_id) AS unique_customer_count
+FROM customers;
+
+-- Find customers who placed more than one order
+
+SELECT customer_unique_id, COUNT(*) AS order_count
+FROM customers
+GROUP BY customer_unique_id
+HAVING COUNT(*) > 1
+ORDER BY order_count DESC;
+
+-- Calculate Repeat Purchase Rate: % of unique customers who ordered more than once
+
+WITH customer_order_counts AS (
+    SELECT customer_unique_id, COUNT(*) AS order_count
+    FROM customers
+    GROUP BY customer_unique_id
+)
+SELECT
+    COUNT(*) AS total_customers,
+    COUNT(*) FILTER (WHERE order_count > 1) AS repeat_customers,
+    ROUND(100.0 * COUNT(*) FILTER (WHERE order_count > 1) / COUNT(*), 2) AS repeat_customer_pct
+FROM customer_order_counts;
