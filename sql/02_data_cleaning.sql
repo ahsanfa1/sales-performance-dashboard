@@ -33,9 +33,13 @@ Highest # of orders for 1 customer: 17
 
 8. Calculated repeat purchase rate using customer_unique_id: 3.12% (2,997 of 96,096 
 unique customers ordered more than once).
+
+9. Checked city name consistency (casing and spelling) for customers and sellers: lowercase
+comparison showed 0 case mismatches, top 20 cities by volume in both tables showed no
+duplicate/misspelled variants. 
 */
 
--- Check for missing values in each table
+-- Check for missing values in each table:
 
 -- Customers
 SELECT
@@ -237,3 +241,40 @@ SELECT
     COUNT(*) FILTER (WHERE order_count > 1) AS repeat_customers,
     ROUND(100.0 * COUNT(*) FILTER (WHERE order_count > 1) / COUNT(*), 2) AS repeat_customer_pct
 FROM customer_order_counts;
+
+/* Compare distinct city spellings vs after lowercase.
+If these numbers are different, the same city is being written more than 1 way */
+
+SELECT 
+    COUNT(DISTINCT customer_city) AS distinct_city_raw,
+    COUNT(DISTINCT LOWER(customer_city)) AS distinct_city_lowercase
+FROM customers;
+
+SELECT 
+    COUNT(DISTINCT seller_city) AS distinct_city_raw,
+    COUNT(DISTINCT LOWER(seller_city)) AS distinct_city_lowercase
+FROM sellers;
+
+-- Every distinct customer city, in alphabetical order
+
+SELECT customer_city, COUNT(*) AS occurrences
+FROM customers
+GROUP BY customer_city
+ORDER BY customer_city ASC;
+
+-- Top 20 customer cities by order volume
+
+SELECT customer_city, COUNT(*) AS occurrences
+FROM customers
+GROUP BY customer_city
+ORDER BY occurrences DESC
+LIMIT 20;
+
+-- Top 20 seller cities by order volume
+
+SELECT s.seller_city, COUNT(*) AS occurrences
+FROM order_items oi
+JOIN sellers s ON oi.seller_id = s.seller_id
+GROUP BY s.seller_city
+ORDER BY occurrences DESC
+LIMIT 20;
