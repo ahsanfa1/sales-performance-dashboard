@@ -90,3 +90,30 @@ SELECT ROUND(100.0 * COUNT(*) FILTER (WHERE delivery_status = 'On time')
 FROM vw_orders;
 
 -- Results: on_time_rate = 93.23%
+
+-- View 3: one row per item sold with seller location and item value
+
+CREATE OR REPLACE VIEW vw_order_items AS
+SELECT
+    items.order_id,
+    items.order_item_id,
+    items.product_id,
+    items.seller_id,
+    s.seller_city,
+    s.seller_state,
+    items.price,
+    items.freight_value,
+    items.price + items.freight_value AS total_item_value -- full amount that customer paid
+FROM order_items items
+JOIN sellers s ON items.seller_id = s.seller_id;
+
+-- Confirm that no items were dropped by the join (should match order_items: 112,650)
+
+SELECT COUNT(*) FROM vw_order_items;
+
+-- Total product revenue and shipping across all items
+
+SELECT SUM(price) AS total_revenue, SUM(freight_value) AS total_freight
+FROM vw_order_items;
+
+-- Results: Total revenue = 13,591,643.70, Total freight = 2,251,909.54 (includes canceled orders)
